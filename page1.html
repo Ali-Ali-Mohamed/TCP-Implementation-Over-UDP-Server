@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Page 1</title>
+</head>
+<body>
+<h1>Choose thw Method</h1>
+    <form id="method" name="method" action="#" onsubmit="return validateForm()">
+        <div class="form-group">
+            <label for="fname">First name:</label>
+            <input type="text" id="fname" name="fname"><br><br>
+            <label for="lname">Last name:</label>
+            <input type="text" id="lname" name="lname"><br><br>
+            <hr>
+            <input type="radio" name="method" value="post" checked>Post Method<br>
+            <input type="radio" name="method" value="get">Get Method<br>
+            <hr>
+            <button type="submit" value='Submit' >Submit</button>
+        </div>
+    </form>
+</body>
+</html>
+
+<script>
+    function validateForm(){
+        var x= document.forms["method"]["fname"].value;
+        var y= document.forms["method"]["lname"].value;
+        var z= document.forms["method"]["method"].value;
+        if(x==""){
+            alert("You must enter a name");
+            return false;
+        }
+        else if(y==""){
+            alert("You must enter a name");
+            return false;
+        }
+        if(z == "post"){
+
+        }
+        else if(z == "get"){
+
+        }
+    }
+</script>
