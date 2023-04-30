@@ -1,13 +1,89 @@
+import threading
+import time
 import random
 import struct
 
 class TCP:
-    def __init__(self, src_port: int, dst_port: int) -> None:
+    def __init__(self, src_port: int, dst_port: int, src_ip: int, dest_ip: int, connection) -> None:
+        self.connection = connection
+        self.dest_ip = dest_ip
+        self.src_ip = src_ip
         self.src_port = src_port
         self.dst_port = dst_port
-        self.seq_num = 0
+        self.seq_num = '0'
         self.ack_num = 0
         self.last_message = None
+        self.last_seq_num = 0
+        self.checksum = 0
+        self.bytes_to_send = None
+        self.syn = 0
+        self.ack = 0
+        self.fin = 0
+        self.x = 0
+        self.y = 0
+        self.data = None
+
+    def check_received(self, data):
+        self.packet_decode()
+        if self.validate_checksum() and self.seq_num == self.last_seq_num:
+            self.stop_timer()
+            self.last_seq_num = not self.last_seq_num
+            self.data = "1111"
+            self.start_timer()
+        else:
+            print("duplicate packet or wrong seq number")
+
+    def handle(self, data, address):
+        self.packet_decode(data)
+
+        if self.validate_checksum(data) and self.seq_num == self.last_seq_num:
+            self.stop_timer()
+            if self.syn == 1:
+                self.send(1)
+                print("start connection")
+            elif self.ack == 1:
+                print("confirming start of connection")
+            elif self.fin == 1:
+                print("closing connection")
+            else:
+                print("normal packet")
+
+        else:
+            pass    #wait for uncorrupted message
+
+    def stop_timer(self):
+        pass
+
+    def timeout(self, data, address):
+        pass
+
+    def start_timer(self):
+        pass
+
+    def send(self, type):
+        if type == 1:   #respond to start connection
+            self.ack = 1
+            self.syn = 1
+            #self.x = 0
+            #self.y = 0
+            #self.last_seq_num = self.seq_num
+            #self.seq_num = 1  # random number
+            #get checksum
+            #self.bytes_to_send = 1
+
+        elif type == 2:
+            pass
+
+        #elif type == 3:
+
+        #elif type == 4:
+
+    def get_flags(self):
+        binary = bin(self.flags)
+        ack = binary[14]
+        rst = binary[16]
+        syn = binary[17]
+        fin = binary[18]
 
     def divide(self, message: bytes):
         packets = []
@@ -15,6 +91,13 @@ class TCP:
             packet = message[i: i + 4]
             packets.append(packet)
         return packets
+
+    def concat(self, data) -> str:
+        message = ''
+        for i in data:
+            message = message + i
+        return message
+
 
     def str_to_bytes(self, message: str) -> bytes:
         return message.encode()
@@ -96,7 +179,7 @@ class TCP:
         false_checksum[ind] = '1' if false_checksum[ind] == '0' else '0'
         return ''.join(false_checksum)
 
-    def corrupt_packet(self, packet: str) -> str:
+    def corrupt_packet(self, packet: str) -> bytes:
         ind = random.choice(range(len(packet)))
         false_packet = list(packet)
         false_packet[ind] = '1' if false_packet[ind] == '0' else '0'
@@ -145,18 +228,36 @@ class TCP:
         else:
             return 0
 
-t = TCP(1,2)
+    def sender(self, message: bytes):
+        packets = self.divide(message)
 
-message = 'wecrbgdrrefasdhabcvaodfgipvnkalsdfgafg'
-packets = t.divide(message)
-print(packets)
-seq_num = 0
+        for data in packets:
+            data, x, y = t.packet_len(data)
+            dataBin = t.str_to_bin(data)
+            checkSum = t.calc_checksum(dataBin)
+            checkSum = t.bin_to_str(checkSum)
+            t.packet_encode(self.seq_num, '1', checkSum, '1', '0', x, y, data)
+            if self.seq_num == '0':
+                self.seq_num = '1'
+            elif self.seq_num == '1':
+                self.seq_num = '0'
 
-for packet_data in packets:
-    packet_data, x, y = t.packet_len(packet_data)
-    packet_bin = t.str_to_bin(packet_data)
-    checksum = t.calc_checksum(packet_bin)
-    checksum = t.bin_to_str(checksum)
-    fin = t.check_fin(x,y)
-    t.packet_decode(t.packet_encode(seq_num, 1, checksum, 1, fin, x, y, packet_data))
-    seq_num += 1
+        #fin flag should be one in the last packet
+        #t.packet_encode(self.seq_num, '1', checkSum, '1', '1', '1', '1', data)
+
+    def receiver(self,):
+        packets = ''
+        while True:
+            packets = t.packet_decode(packet)
+            message = self.concat(packets)
+            print(message)
+            for packet_data in packets:
+                packet_data, x, y = t.packet_len(packet_data)
+                packet_bin = t.str_to_bin(packet_data)
+                checksum = t.calc_checksum(packet_bin)
+                checksum = t.bin_to_str(checksum)
+                fin = t.check_fin(x, y)
+                t.packet_decode(t.packet_encode(seq_num, 1, checksum, 1, fin, x, y, packet_data))
+                seq_num += 1
+
+t = TCP(1,2,5,5,1)
