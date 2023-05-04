@@ -1,7 +1,9 @@
-import threading
-import time
 import random
 import struct
+import time
+
+from PyQt5.QtCore import QTimer
+
 
 class TCP:
     def __init__(self, src_port: int, dst_port: int, src_ip: int, dest_ip: int, connection) -> None:
@@ -51,14 +53,18 @@ class TCP:
         else:
             pass    #wait for uncorrupted message
 
-    def stop_timer(self):
-        pass
+    def stop_timer(self, timer):
+        timer.stop()
+        return timer
 
-    def timeout(self, data, address):
+    def timeout(self):
         pass
 
     def start_timer(self):
-        pass
+        timer = QTimer(self)
+        timer.timeout.connect(self.processOneThing)
+        timer.start()
+        return timer
 
     def send(self, type):
         if type == 1:   #respond to start connection
