@@ -1,53 +1,19 @@
+import tcp
 import socket
 
-localIP = "127.0.0.1"
-localPort = 20001
+clientIP = "127.0.0.1"
+clientPort = 20002
+
+serverIP = "127.0.0.1"
+serverPort = 20001
+
 bufferSize = 1024
-msgFromServer = "Hello UDP Client"
-to_be_sent_bytes = str.encode(msgFromServer)
 
-# Create a datagram socket
-UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+# Create a tcp socket at server side
+s = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+# t = tcp.TCP(serverPort, clientPort, serverIP, clientIP, bufferSize, 50)
+t = tcp.TCP(clientPort, serverPort, clientIP, serverIP, bufferSize, 50)
 
-# Bind to address and ip
-UDPServerSocket.bind((localIP, localPort))
-
-print("UDP server up and listening")
-
-SYN, address = UDPServerSocket.recvfrom(bufferSize)
-print(SYN)
-print(SYN.decode())
-if SYN.decode() == 'SYN':
-    print('SYN Received')
-else:
-    print('Error')
-    raise RuntimeError('Error in Handshaking')
-
-SYNACK = 'SYNACK'
-UDPServerSocket.sendto(SYNACK.encode(), address)
-print('SYNACK Sent')
-
-ACK, address = UDPServerSocket.recvfrom(bufferSize)
-if ACK.decode() == "ACK":
-    print('ACK Received')
-else:
-    print('Error')
-    raise RuntimeError('Error in Handshaking')
-
-
-# Listen for incoming datagrams
-while True:
-    bytesAddressPair = UDPServerSocket.recvfrom(bufferSize)
-
-    message = bytesAddressPair[0]
-
-    address = bytesAddressPair[1]
-
-    clientMsg = "Message from Client:{}".format(message)
-    clientIP = "Client IP Address:{}".format(address)
-
-    print(clientMsg)
-    print(clientIP)
-
-    # Sending a reply to client
-    UDPServerSocket.sendto(to_be_sent_bytes, address)
+print("TCP server up and listening")
+t.receiver()
+print("Message Received")
