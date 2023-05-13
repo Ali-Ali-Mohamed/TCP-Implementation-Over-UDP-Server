@@ -6,7 +6,7 @@ import struct
 from PyQt5.QtCore import QTimer
 import socket
 
-
+gdgdf
 class TCP:
     def __init__(self, src_port: int, dst_port: int, src_ip: str, dst_ip: str, buffer_size: int,
                  timeout: int) -> None:
