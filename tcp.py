@@ -3,13 +3,12 @@ import threading
 import time
 import random
 import struct
-from PyQt5.QtCore import QTimer
 import socket
 
 
 class TCP:
     def __init__(self, src_port: int, dst_port: int, src_ip: str, dst_ip: str, buffer_size: int,
-                 timeout: int) -> None:
+                 timeout: float) -> None:
         self.dst_ip = dst_ip
         self.src_ip = src_ip
         self.src_port = src_port
@@ -17,13 +16,14 @@ class TCP:
 
         self.seg = None
         self.resent_msg = None
+        self.last_seq_num = None
         self.connection = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 
         self.buffer_size = buffer_size - 10
         self.timeout = timeout
 
-        self.ack_timer = QTimer(None)
-        self.ack_timer.timeout.connect(lambda: self.resend(self.resent_msg, self.last_seq_num))
+        self.timer = None
+        self.received = None
 
     def bin_to_str(self, binary: str):
         str_data = ''
@@ -123,82 +123,82 @@ class TCP:
         data = data[:count]
         return data
 
-    def resend(self, resent: str, num=0):
-        if resent.lower() == 'seg':
-            self.connection.sendto(self.seg, (self.dst_ip, self.dst_port))
-        elif resent.lower() == 'syn':
-            self.connection.sendto(self.packet_encode(0, '', 0, 0, 1, 0, 0), (self.dst_ip, self.dst_port))
-        elif resent.lower() == 'ack':
-            self.connection.sendto(self.packet_encode(0, '', 0, num, 0, 1, 0), (self.dst_ip, self.dst_port))
-        elif resent.lower() == 'synack':
-            self.connection.sendto(self.packet_encode(0, '', 0, 0, 1, 1, 0), (self.dst_ip, self.dst_port))
-        elif resent.lower() == 'fin':
-            self.connection.sendto(self.packet_encode(0, '', 0, 0, 0, 0, 1), (self.dst_ip, self.dst_port))
-        elif resent.lower() == 'finack':
-            self.connection.sendto(self.packet_encode(0, '', 0, 0, 0, 1, 1), (self.dst_ip, self.dst_port))
+    def send(self):
+        if not self.received:
+            print('Resending ' + self.resent_msg + ' Message')
+            if self.resent_msg.lower() == 'seg':
+                self.connection.sendto(self.seg, (self.dst_ip, self.dst_port))
+            elif self.resent_msg.lower() == 'syn':
+                self.connection.sendto(self.packet_encode(0, '', 0, 0, 1, 0, 0), (self.dst_ip, self.dst_port))
+            elif self.resent_msg.lower() == 'ack':
+                self.connection.sendto(self.packet_encode(0, '', 0, self.last_seq_num, 0, 1, 0),
+                                       (self.dst_ip, self.dst_port))
+            elif self.resent_msg.lower() == 'synack':
+                self.connection.sendto(self.packet_encode(0, '', 0, 0, 1, 1, 0), (self.dst_ip, self.dst_port))
+            elif self.resent_msg.lower() == 'fin':
+                self.connection.sendto(self.packet_encode(0, '', 0, 0, 0, 0, 1), (self.dst_ip, self.dst_port))
+            elif self.resent_msg.lower() == 'finack':
+                self.connection.sendto(self.packet_encode(0, '', 0, 0, 0, 1, 1), (self.dst_ip, self.dst_port))
+            threading.Timer(self.timeout / 1000, function=self.send)
 
     def sender(self, message: str):
-        print('Send SYN')
-        self.seg = self.packet_encode(0, '', 0, 0, 1, 0, 0)
-        self.connection.sendto(self.seg, (self.dst_ip, self.dst_port))
-        self.ack_timer.start(self.timeout)
+        self.received = False
+        self.resent_msg = 'SYN'
+        self.send()
         print('SYN Sent')
-
-        print('Waiting For SYNACK')
         received_msg, address = self.connection.recvfrom(self.buffer_size + 10)
-        self.ack_timer.stop()
         dst_port, src_port, received_checksum, received_ack_num, received_seq_num, received_syn, received_ack, \
         received_fin, received_data = self.packet_decode(received_msg)
         if received_syn and received_ack:
             print('SYNACK Received')
+            self.received = True
         else:
-            print('Error')
-            raise RuntimeError('Error in Handshaking')
+            print('Resending SYN')
+            while not received_syn or not received_ack:
+                received_msg, address = self.connection.recvfrom(self.buffer_size + 10)
+                dst_port, src_port, received_checksum, received_ack_num, received_seq_num, received_syn, received_ack, \
+                received_fin, received_data = self.packet_decode(received_msg)
 
-        print('Send ACK')
         self.seg = self.packet_encode(0, '', 0, 0, 0, 1, 0)
         self.connection.sendto(self.seg, address)
-        self.ack_timer.start(self.timeout)
         print('ACK Sent')
 
         packets = self.divide(message)
         i = 0
-        ack_num = 0
         seq_num = 0
+        self.last_seq_num = 1
         while i < len(packets):
             message = packets[i]
             checksum = self.get_checksum(message)
-            self.seg = self.packet_encode(checksum, message, ack_num, seq_num, 0, 0, 0)
-            self.connection.sendto(self.seg, address)
-            # self.resent_msg = 'seg'
-            self.ack_timer.start(self.timeout)
+            self.seg = self.packet_encode(checksum, message, 0, seq_num, 0, 0, 0)
+            self.resent_msg = 'seg'
+            self.received = False
+            self.send()
             received_msg, address = self.connection.recvfrom(self.buffer_size + 10)
-            self.ack_timer.stop()
-            dst_port, src_port, received_checksum, received_ack_num, received_seq_num, received_syn, received_ack, received_fin, received_data = self.packet_decode(
-                received_msg)
+            self.received = True
+            dst_port, src_port, received_checksum, received_ack_num, received_seq_num, received_syn, received_ack, \
+            received_fin, received_data = self.packet_decode(received_msg)
+            if received_ack_num != seq_num or not received_ack:
+                continue
             i += 1
+            seq_num = seq_num ^ 1
 
         print("Closing the Connection")
-        print("Send FIN")
+        self.resent_msg = 'FIN'
         self.connection.sendto(self.packet_encode(0, '', 0, 0, 0, 0, 1), address)
         print("FIN sent")
 
-        print("Receive FINACK")
-        received_fin_ack, address = self.connection.recvfrom(self.buffer_size + 10)
-        dst_port, src_port, checksum, ack_num, seq_num, syn, ack, fin, data = self.packet_decode(received_fin_ack)
-        print(ack_num)
-        print(seq_num)
-        print()
-        print(ack)
-        print(fin)
-        if fin and ack:
-            print("FINACK Received")
-        else:
-            print('Error')
-            raise RuntimeError('Error in Closing')
+        while True:
+            received_fin_ack, address = self.connection.recvfrom(self.buffer_size + 10)
+            dst_port, src_port, checksum, ack_num, seq_num, syn, ack, fin, data = self.packet_decode(received_fin_ack)
+            if fin and ack:
+                print("FINACK Received")
+                break
+            else:
+                continue
 
-        print("Send ACK to close connection")
-        self.connection.sendto(self.packet_encode(0, '', 0, 0, 0, 1, 1), address)
+        self.resent_msg = 'ACK'
+        self.connection.sendto(self.packet_encode(0, '', 0, 0, 0, 1, 0), address)
         print("Ack to close connection sent")
         print("Connection Closed")
 
@@ -209,44 +209,41 @@ class TCP:
         if syn:
             print('SYN Received')
         else:
-            print('Error')
-            raise RuntimeError('Error in Handshaking')
+            print('SYN not received')
 
-        print("Send SYNACK")
         self.seg = self.packet_encode(0, '', 0, 0, 1, 1, 0)
         self.connection.sendto(self.seg, address)
         print('SYNACK Sent')
-        print("Receive ACK")
         received_ack, address = self.connection.recvfrom(self.buffer_size + 10)
         dst_port, src_port, checksum, ack_num, seq_num, syn, ack, fin, data = self.packet_decode(received_ack)
         if ack:
             print('ACK Received')
         else:
             print('Error')
-            raise RuntimeError('Error in Handshaking')
 
         message = ''
         while not fin:
             packet, address = self.connection.recvfrom(self.buffer_size + 10)
             dst_port, src_port, checksum, ack_num, seq_num, syn, ack, fin, data = self.packet_decode(packet)
             if data != '':
-                self.connection.sendto(self.packet_encode(0, '', 1, 1, 0, 1, 0), address)
+                self.connection.sendto(self.packet_encode(0, '', seq_num, 0, 0, 1, 0), address)
 
             if not self.validate_checksum(data, checksum) and not fin:
                 print("Error in the message")
                 print("Waiting the sender to send it again")
                 continue
 
-            message += data
+            if seq_num != self.last_seq_num:
+                message += data
+                self.last_seq_num = seq_num
+
+        print("Message {" + message + "}")
 
         print("FIN Received")
-        print("Send FINACK")
         self.connection.sendto(self.packet_encode(0, '', 0, 0, 0, 1, 1), address)
         print("FINACK Sent")
 
         packet, address = self.connection.recvfrom(self.buffer_size + 10)
         dst_port, src_port, checksum, ack_num, seq_num, syn, ack, fin, data = self.packet_decode(packet)
-        if fin and ack:
+        if ack:
             print("ACK to close connection is received")
-
-        print("Message { " + message + " }")

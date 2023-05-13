@@ -7,8 +7,8 @@ clientPort = 20002
 serverIP = "127.0.0.1"
 serverPort = 20001
 
-msgFromClient = "Doneeeeeeee"
-bytesToSend = str.encode(msgFromClient)
+msgFromClient = "Hello This is ahmed sakr id 6736"
+
 
 bufferSize = 1024
 
