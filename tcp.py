@@ -6,6 +6,7 @@ import struct
 from PyQt5.QtCore import QTimer
 import socket
 
+
 class TCP:
     def __init__(self, src_port: int, dst_port: int, src_ip: str, dst_ip: str, buffer_size: int,
                  timeout: int) -> None:
@@ -44,7 +45,7 @@ class TCP:
     def decode_flags(self, flags):
         return bool(16 & flags), bool(8 & flags), bool(4 & flags), bool(2 & flags), bool(1 & flags)
 
-    def get_checksum(self, data, inplace=True):
+    def get_checksum(self, data):
         sum = 0
         for char in data:
             sum += ord(char)
@@ -63,10 +64,7 @@ class TCP:
                 checksum += '0'
             else:
                 checksum += '1'
-        if inplace:
-            self.checksum = int(checksum, 2)
-        else:
-            return int(checksum, 2)
+        return int(checksum, 2)
 
     def divide(self, message: str) -> list[str]:
         packets = []
@@ -80,7 +78,7 @@ class TCP:
         return packets
 
     def validate_checksum(self, received: str, checksum: int):
-        received_sum = self.get_checksum(received, inplace=False)
+        received_sum = self.get_checksum(received)
         return received_sum == checksum
 
     def generate_false_checksum(self, checksum: int) -> int:
@@ -104,7 +102,8 @@ class TCP:
 
     def packet_encode(self, checksum: int, data: str, ack_num, seq_num, syn, ack, fin) -> bytes:
         flags = self.encode_flags(ack_num, seq_num, syn, ack, fin)
-        segment = struct.pack('hhhh' + str(self.buffer_size) + 's', self.src_port, self.dst_port, checksum, flags,data.encode())
+        segment = struct.pack('hhhh' + str(self.buffer_size) + 's', self.src_port, self.dst_port, checksum, flags,
+                              data.encode())
         return segment
 
     def packet_decode(self, packet: bytes):
@@ -148,7 +147,8 @@ class TCP:
         print('Waiting For SYNACK')
         received_msg, address = self.connection.recvfrom(self.buffer_size + 10)
         self.ack_timer.stop()
-        dst_port, src_port, received_checksum, received_ack_num, received_seq_num, received_syn, received_ack, received_fin, received_data = self.packet_decode(received_msg)
+        dst_port, src_port, received_checksum, received_ack_num, received_seq_num, received_syn, received_ack, \
+        received_fin, received_data = self.packet_decode(received_msg)
         if received_syn and received_ack:
             print('SYNACK Received')
         else:
@@ -168,13 +168,14 @@ class TCP:
         while i < len(packets):
             message = packets[i]
             checksum = self.get_checksum(message)
-            self.seg = self.packet_encode(self.checksum, message, ack_num, seq_num, 0, 0, 0)
+            self.seg = self.packet_encode(checksum, message, ack_num, seq_num, 0, 0, 0)
             self.connection.sendto(self.seg, address)
-            #self.resent_msg = 'seg'
+            # self.resent_msg = 'seg'
             self.ack_timer.start(self.timeout)
             received_msg, address = self.connection.recvfrom(self.buffer_size + 10)
             self.ack_timer.stop()
-            dst_port, src_port, received_checksum, received_ack_num, received_seq_num, received_syn, received_ack, received_fin, received_data = self.packet_decode(received_msg)
+            dst_port, src_port, received_checksum, received_ack_num, received_seq_num, received_syn, received_ack, received_fin, received_data = self.packet_decode(
+                received_msg)
             if received_ack_num != seq_num or not received_ack:
                 continue
             seq_num = 1 if received_seq_num == 0 else 0
