@@ -229,13 +229,13 @@ class TCP:
         while not fin:
             packet, address = self.connection.recvfrom(self.buffer_size + 10)
             dst_port, src_port, checksum, ack_num, seq_num, syn, ack, fin, data = self.packet_decode(packet)
+            if data != '':
+                self.connection.sendto(self.packet_encode(0, '', 1, 1, 0, 1, 0), address)
 
             if not self.validate_checksum(data, checksum) and not fin:
                 print("Error in the message")
                 print("Waiting the sender to send it again")
                 continue
-
-            self.connection.sendto(self.packet_encode(0, '', 1, 1, 0, 1, 0), address)
 
             message += data
 
