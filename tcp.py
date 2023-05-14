@@ -17,7 +17,7 @@ class TCP:
         self.seg = None
         self.resent_msg = None
         self.last_seq_num = None
-        self.connection = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        self.connection = None
 
         self.buffer_size = buffer_size - 10
         self.timeout = timeout
@@ -141,7 +141,7 @@ class TCP:
                 self.connection.sendto(self.packet_encode(0, '', 0, 0, 0, 1, 1), (self.dst_ip, self.dst_port))
             threading.Timer(self.timeout / 1000, function=self.send)
 
-    def sender(self, message: str):
+    def initialize(self):
         self.received = False
         self.resent_msg = 'SYN'
         self.send()
@@ -163,6 +163,9 @@ class TCP:
         self.connection.sendto(self.seg, address)
         print('ACK Sent')
 
+    def sender(self, message: str):
+        self.connection = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        self.initialize()
         packets = self.divide(message)
         i = 0
         seq_num = 0
@@ -200,16 +203,18 @@ class TCP:
         self.resent_msg = 'ACK'
         self.connection.sendto(self.packet_encode(0, '', 0, 0, 0, 1, 0), address)
         print("Ack to close connection sent")
+
+        self.connection.close()
         print("Connection Closed")
 
-    def receiver(self):
+    def rec_initializer(self):
         self.connection.bind((self.dst_ip, self.dst_port))
         received_syn, address = self.connection.recvfrom(self.buffer_size + 10)
         dst_port, src_port, checksum, ack_num, seq_num, syn, ack, fin, data = self.packet_decode(received_syn)
         if syn:
             print('SYN Received')
         else:
-            print('SYN not received')
+            print('SYN Not Received')
 
         self.seg = self.packet_encode(0, '', 0, 0, 1, 1, 0)
         self.connection.sendto(self.seg, address)
@@ -221,6 +226,10 @@ class TCP:
         else:
             print('Error')
 
+    def receiver(self):
+        self.connection = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        self.rec_initializer()
+        fin = 0
         message = ''
         while not fin:
             packet, address = self.connection.recvfrom(self.buffer_size + 10)
@@ -247,3 +256,5 @@ class TCP:
         dst_port, src_port, checksum, ack_num, seq_num, syn, ack, fin, data = self.packet_decode(packet)
         if ack:
             print("ACK to close connection is received")
+        self.connection.close()
+        return message
