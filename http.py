@@ -63,6 +63,7 @@ class HTTPServer(TCPServer):
             code = 200
             with open(file, 'rb') as f:
                 self.response_body = f.read()
+                print(self.response_body)
         else:
             code = 404
             self.response_body = b"<h1>File Not Found</h1>"
@@ -84,7 +85,7 @@ class HTTPServer(TCPServer):
         if os.path.exists(file):
             code = 200
             with open(file, 'w') as f:
-                f.write(self.req_body.decode())
+                f.write(self.req_body)
                 self.response_body = b"<h1>File updated successfully</h1"
         else:
             code = 404

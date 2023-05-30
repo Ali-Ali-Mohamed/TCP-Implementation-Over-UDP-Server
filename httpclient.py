@@ -34,7 +34,6 @@ class HTTPClient:
         return b"".join([status, host, body, blank])
 
 
-PORT = 20001
 HOST = "localhost"
 PATH = "/helo.html"
 HTTP_V = "1.1"
@@ -45,9 +44,9 @@ POST_Message = "<html>" \
 
 if __name__ == '__main__':
     client = HTTPClient()
-    request = client.get_request(PATH, HOST, HTTP_V)
+    request = client.post_request(PATH, HOST, HTTP_V, POST_Message)
 
-    c = TCP(20001, 20002, 'localhost', 'localhost', 1024, 50)
+    c = TCP(20003, 20004, 'localhost', 'localhost', 1024, 50)
     sock = c.connection
     c.sender(request.decode())
     # sock.sendall(request)

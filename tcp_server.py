@@ -7,7 +7,7 @@ class TCPServer:
         self.pport = port
 
     def start(self):
-        s = TCP(20001, 20002, 'localhost', 'localhost', 1024, 50)
+        s = TCP(20003, 20004, 'localhost', 'localhost', 1024, 50)
         print('Server is Listening')
         while True:
             data = s.receiver()

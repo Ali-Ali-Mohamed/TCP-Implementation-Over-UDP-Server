@@ -1,6 +1,4 @@
-import os
 import threading
-import time
 import random
 import struct
 import socket
